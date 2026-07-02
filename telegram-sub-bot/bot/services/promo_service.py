@@ -104,8 +104,12 @@ async def activate_code(
     channels = json.loads(promo.channels)
     lines = []
     for ch in channels:
-        display = ch.get("display", ch)
-        check = ch.get("check", display)
+        if isinstance(ch, dict):
+            display = ch.get("display", ch)
+            check = ch.get("check", display)
+        else:
+            display = str(ch).strip()
+            check = display
         sub = Subscription(
             user_id=user.id,
             promo_code_id=promo.id,

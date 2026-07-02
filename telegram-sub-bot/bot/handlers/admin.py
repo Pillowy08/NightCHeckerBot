@@ -17,7 +17,13 @@ logger = logging.getLogger(__name__)
 admin_router = Router()
 
 
-async def safe_send(message: Message, text: str, **kwargs):
+async def channel_display(ch) -> str:
+    if isinstance(ch, dict):
+        return ch.get("display", str(ch))
+    return str(ch).strip()
+
+
+def safe_send(message: Message, text: str, **kwargs):
     try:
         await message.answer(text, **kwargs)
     except Exception as e:
@@ -62,7 +68,7 @@ async def cmd_add_code(message: Message):
         async with maker() as session:
             promo = await create_promo_code(session, code, ttl, channels)
             raw = json.loads(promo.channels)
-            display_list = ", ".join(ch.get("display", ch) for ch in raw)
+            display_list = ", ".join(channel_display(ch) for ch in raw)
             await safe_send(
                 message,
                 f"✅ Код <code>{promo.code}</code> создан!\n"
@@ -98,7 +104,7 @@ async def cmd_codes(message: Message):
                 max_u = c.max_uses if c.max_uses else "∞"
                 uses = f"{c.used_count}/{max_u}"
                 raw = json.loads(c.channels)
-                chs = ", ".join(ch.get("display", ch) for ch in raw)
+                chs = ", ".join(channel_display(ch) for ch in raw)
                 lines.append(
                     f"{status} <code>{c.code}</code> | до {expires} | {uses}\n"
                     f"       каналы: {chs}"
@@ -196,7 +202,7 @@ async def cmd_add_channel(message: Message):
 
             channels = json.loads(promo.channels)
             display, check = parse_channel_input(channel)
-            existing_displays = [ch.get("display", ch) for ch in channels]
+            existing_displays = [channel_display(ch) for ch in channels]
             if display in existing_displays:
                 await safe_send(
                     message,
@@ -224,41 +230,65 @@ async def cmd_admin_stats(message: Message):
     try:
         maker = get_session_maker()
         async with maker() as session:
-            total_users = (
-                await session.execute(select(func.count(User.id)))
-            ).scalar()
+            try:
+                total_users = (
+                    await session.execute(select(func.count(User.id)))
+                ).scalar()
+            except Exception as e:
+                logger.error(f"Stats query 1 (users) failed: {e}")
+                raise
 
-            active_subs_count = (
-                await session.execute(
-                    select(func.count(Subscription.id)).where(Subscription.is_active == True)
-                )
-            ).scalar()
-
-            active_codes = (
-                await session.execute(
-                    select(func.count(PromoCode.id)).where(PromoCode.is_active == True)
-                )
-            ).scalar()
-
-            total_codes = (
-                await session.execute(select(func.count(PromoCode.id)))
-            ).scalar()
-
-            unsub_events = (
-                await session.execute(
-                    select(func.count(Event.id)).where(Event.event_type == "unsubscribe")
-                )
-            ).scalar()
-
-            today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
-            activations_today = (
-                await session.execute(
-                    select(func.count(Event.id)).where(
-                        Event.event_type == "code_activated",
-                        func.date(Event.created_at) == today,
+            try:
+                active_subs_count = (
+                    await session.execute(
+                        select(func.count(Subscription.id)).where(Subscription.is_active == True)
                     )
-                )
-            ).scalar()
+                ).scalar()
+            except Exception as e:
+                logger.error(f"Stats query 2 (subscriptions) failed: {e}")
+                raise
+
+            try:
+                active_codes = (
+                    await session.execute(
+                        select(func.count(PromoCode.id)).where(PromoCode.is_active == True)
+                    )
+                ).scalar()
+            except Exception as e:
+                logger.error(f"Stats query 3 (active codes) failed: {e}")
+                raise
+
+            try:
+                total_codes = (
+                    await session.execute(select(func.count(PromoCode.id)))
+                ).scalar()
+            except Exception as e:
+                logger.error(f"Stats query 4 (total codes) failed: {e}")
+                raise
+
+            try:
+                unsub_events = (
+                    await session.execute(
+                        select(func.count(Event.id)).where(Event.event_type == "unsubscribe")
+                    )
+                ).scalar()
+            except Exception as e:
+                logger.error(f"Stats query 5 (events) failed: {e}")
+                raise
+
+            try:
+                today = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+                activations_today = (
+                    await session.execute(
+                        select(func.count(Event.id)).where(
+                            Event.event_type == "code_activated",
+                            func.date(Event.created_at) == today,
+                        )
+                    )
+                ).scalar()
+            except Exception as e:
+                logger.error(f"Stats query 6 (today) failed: {e}")
+                raise
 
         await safe_send(
             message,
