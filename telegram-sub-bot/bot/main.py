@@ -42,7 +42,9 @@ async def main():
     dp.include_router(user_router)
 
     if config.ADMIN_IDS:
-        admin_router.message.middleware(AdminMiddleware(config.ADMIN_IDS))
+        admin_mw = AdminMiddleware(config.ADMIN_IDS)
+        admin_router.message.middleware(admin_mw)
+        admin_router.callback_query.middleware(admin_mw)
         dp.include_router(admin_router)
 
     scheduler.add_job(

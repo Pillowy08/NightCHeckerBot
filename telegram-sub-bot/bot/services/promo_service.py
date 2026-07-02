@@ -1,9 +1,10 @@
 import json
 from datetime import datetime, timedelta, timezone
-from sqlalchemy import select, func
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from bot.db.models import User, PromoCode, Subscription, Event
+from bot.utils.helpers import parse_channel_input
 
 
 def parse_ttl(ttl: str) -> timedelta:
@@ -18,7 +19,7 @@ def parse_ttl(ttl: str) -> timedelta:
     elif unit == "w":
         return timedelta(weeks=value)
     else:
-        raise ValueError(f"Unknown TTL unit: {unit}")
+        raise ValueError(f"Неизвестная единица TTL: {unit}. Используй m, h, d, w")
 
 
 async def create_promo_code(
@@ -29,10 +30,14 @@ async def create_promo_code(
     max_uses: int | None = None,
 ) -> PromoCode:
     expires_at = datetime.now(timezone.utc) + parse_ttl(ttl)
+    parsed_channels = []
+    for ch in channels:
+        display, check = parse_channel_input(ch)
+        parsed_channels.append({"display": display, "check": check})
     promo = PromoCode(
         code=code.upper(),
         expires_at=expires_at,
-        channels=json.dumps(channels),
+        channels=json.dumps(parsed_channels),
         max_uses=max_uses,
     )
     session.add(promo)
@@ -55,16 +60,16 @@ async def activate_code(
     promo = result.scalar_one_or_none()
 
     if promo is None:
-        return False, "Code not found."
+        return False, "❌ Код не найден."
 
     if not promo.is_active:
-        return False, "This code is no longer active."
+        return False, "❌ Этот код больше не активен."
 
     if promo.expires_at.replace(tzinfo=timezone.utc) < datetime.now(timezone.utc):
-        return False, "This code has expired."
+        return False, "❌ Срок действия кода истёк."
 
     if promo.max_uses is not None and promo.used_count >= promo.max_uses:
-        return False, "This code has reached its usage limit."
+        return False, "❌ Код исчерпал лимит использований."
 
     result = await session.execute(
         select(User).where(User.telegram_id == telegram_id)
@@ -94,28 +99,33 @@ async def activate_code(
     )
     existing = result.scalar_one_or_none()
     if existing:
-        return False, "You already have this code activated."
+        return False, "⚠️ Этот код уже активирован."
 
     channels = json.loads(promo.channels)
-    for channel in channels:
+    lines = []
+    for ch in channels:
+        display = ch.get("display", ch)
+        check = ch.get("check", display)
         sub = Subscription(
             user_id=user.id,
             promo_code_id=promo.id,
-            channel=channel.strip(),
+            channel=display,
+            check_id=check,
         )
         session.add(sub)
+        lines.append(f"• {display}")
 
     promo.used_count += 1
 
     event = Event(
         user_id=telegram_id,
         event_type="code_activated",
-        description=f"Activated code {code.upper()}, channels: {', '.join(channels)}",
+        description=f"Activated code {code.upper()}",
     )
     session.add(event)
 
     await session.commit()
-    return True, f"Code activated! You are now subscribed to:\n" + "\n".join(f"• {ch}" for ch in channels)
+    return True, "✅ Код активирован! Ты подписан на:\n" + "\n".join(lines)
 
 
 async def get_user_subscriptions(session: AsyncSession, telegram_id: int) -> list[dict]:

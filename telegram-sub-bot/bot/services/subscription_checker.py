@@ -27,8 +27,9 @@ async def check_subscriptions(
                 continue
 
             try:
+                chat_target = sub.check_id if sub.check_id else sub.channel
                 member = await bot.get_chat_member(
-                    chat_id=sub.channel,
+                    chat_id=chat_target,
                     user_id=user.telegram_id,
                 )
                 if member.status in ("left", "kicked"):
@@ -37,22 +38,22 @@ async def check_subscriptions(
                     event = Event(
                         user_id=user.telegram_id,
                         event_type="unsubscribe",
-                        description=f"Unsubscribed from {sub.channel}",
+                        description=f"Отписка от {sub.channel}",
                     )
                     session.add(event)
 
                     await bot.send_message(
                         chat_id=user.telegram_id,
-                        text=f"You have been unsubscribed from {sub.channel}. "
-                        "Please re-subscribe to keep access.",
+                        text=f"❌ Ты отписался от канала {sub.channel}.\n"
+                        "Доступ отключён. Подпишись снова, чтобы восстановить доступ.",
                     )
 
                     for admin_id in admin_ids:
                         try:
                             await bot.send_message(
                                 chat_id=admin_id,
-                                text=f"User {user.telegram_id} (@{user.username or 'N/A'}) "
-                                f"unsubscribed from {sub.channel}.",
+                                text=f"⚠️ Пользователь {user.telegram_id} (@{user.username or 'N/A'}) "
+                                f"отписался от канала {sub.channel}.",
                             )
                         except Exception:
                             pass

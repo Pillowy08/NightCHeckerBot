@@ -1,6 +1,6 @@
 from typing import Callable, Any, Awaitable
 from aiogram import BaseMiddleware
-from aiogram.types import Message, TelegramObject
+from aiogram.types import Message, CallbackQuery, TelegramObject
 
 
 class AdminMiddleware(BaseMiddleware):
@@ -13,8 +13,17 @@ class AdminMiddleware(BaseMiddleware):
         event: TelegramObject,
         data: dict[str, Any],
     ) -> Any:
+        user_id = None
         if isinstance(event, Message):
-            if event.from_user.id not in self.admin_ids:
-                await event.answer("Access denied. You are not an admin.")
-                return
+            user_id = event.from_user.id
+        elif isinstance(event, CallbackQuery):
+            user_id = event.from_user.id
+
+        if user_id is not None and user_id not in self.admin_ids:
+            if isinstance(event, Message):
+                await event.answer("⛔ Доступ запрещён.")
+            elif isinstance(event, CallbackQuery):
+                await event.answer("⛔ Доступ запрещён.", show_alert=True)
+            return
+
         return await handler(event, data)
