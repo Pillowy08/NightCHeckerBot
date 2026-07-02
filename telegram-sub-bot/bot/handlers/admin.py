@@ -6,7 +6,7 @@ from aiogram import Router, Bot
 from aiogram.types import Message
 from aiogram.filters import Command
 
-from bot.db.database import async_session_maker
+from bot.db.database import get_session_maker
 from bot.db.models import User, PromoCode, Subscription, Event
 from bot.services.promo_service import create_promo_code
 
@@ -31,7 +31,8 @@ async def cmd_add_code(message: Message):
         await message.answer("At least one channel is required.")
         return
 
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         try:
             promo = await create_promo_code(session, code, ttl, channels)
             await message.answer(
@@ -46,7 +47,8 @@ async def cmd_add_code(message: Message):
 
 @admin_router.message(Command("codes"))
 async def cmd_codes(message: Message):
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         result = await session.execute(
             select(PromoCode).order_by(PromoCode.created_at.desc())
         )
@@ -80,7 +82,8 @@ async def cmd_revoke_code(message: Message):
 
     code = parts[1].strip().upper()
 
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         result = await session.execute(
             select(PromoCode).where(PromoCode.code == code)
         )
@@ -123,7 +126,8 @@ async def cmd_add_channel(message: Message):
     code = code.strip().upper()
     channel = channel.strip()
 
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         result = await session.execute(
             select(PromoCode).where(PromoCode.code == code)
         )
@@ -147,7 +151,8 @@ async def cmd_add_channel(message: Message):
 
 @admin_router.message(Command("admin_stats"))
 async def cmd_admin_stats(message: Message):
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         total_users = (
             await session.execute(select(func.count(User.id)))
         ).scalar()
@@ -203,7 +208,8 @@ async def cmd_broadcast(message: Message, bot: Bot):
 
     broadcast_text = parts[1]
 
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         result = await session.execute(select(User.telegram_id))
         user_ids = [row[0] for row in result.all()]
 

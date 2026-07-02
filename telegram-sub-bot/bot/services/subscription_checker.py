@@ -1,17 +1,17 @@
 from aiogram import Bot
 from sqlalchemy import select
-from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
+from bot.db.database import get_session_maker
 from bot.db.models import User, Subscription, Event
 
 
 async def check_subscriptions(
     bot: Bot,
-    session_maker: async_sessionmaker[AsyncSession],
     admin_ids: list[int],
 ):
 
-    async with session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         result = await session.execute(
             select(Subscription)
             .where(Subscription.is_active == True)

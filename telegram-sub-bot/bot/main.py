@@ -7,7 +7,7 @@ from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
 from bot.config import Config
-from bot.db.database import init_db, close_db, async_session_maker
+from bot.db.database import init_db, close_db
 from bot.handlers.user import user_router
 from bot.handlers.admin import admin_router
 from bot.middlewares.admin import AdminMiddleware
@@ -36,6 +36,7 @@ async def main():
 
     logger.info("Starting bot...")
     bot = Bot(token=config.BOT_TOKEN)
+    await bot.delete_webhook(drop_pending_updates=True)
     dp = Dispatcher(storage=MemoryStorage())
 
     dp.include_router(user_router)
@@ -47,7 +48,7 @@ async def main():
     scheduler.add_job(
         check_subscriptions,
         IntervalTrigger(hours=1),
-        args=[bot, async_session_maker, config.ADMIN_IDS],
+        args=[bot, config.ADMIN_IDS],
         id="subscription_check",
         replace_existing=True,
     )

@@ -2,7 +2,7 @@ from aiogram import Router
 from aiogram.types import Message
 from aiogram.filters import Command
 
-from bot.db.database import async_session_maker
+from bot.db.database import get_session_maker
 from bot.services.promo_service import activate_code, get_user_subscriptions, get_or_create_user
 
 user_router = Router()
@@ -10,7 +10,8 @@ user_router = Router()
 
 @user_router.message(Command("start"))
 async def cmd_start(message: Message):
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         await get_or_create_user(
             session,
             message.from_user.id,
@@ -65,7 +66,8 @@ async def cmd_commands(message: Message):
 
 @user_router.message(Command("status"))
 async def cmd_status(message: Message):
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         subs = await get_user_subscriptions(session, message.from_user.id)
     if not subs:
         await message.answer("You have no active subscriptions. Use /code to activate a promo code.")
@@ -80,7 +82,8 @@ async def cmd_status(message: Message):
 
 @user_router.message(Command("my_channels"))
 async def cmd_my_channels(message: Message):
-    async with async_session_maker() as session:
+    maker = get_session_maker()
+    async with maker() as session:
         subs = await get_user_subscriptions(session, message.from_user.id)
     active = [s for s in subs if s["is_active"]]
 
@@ -102,8 +105,8 @@ async def cmd_code(message: Message):
         return
 
     code = args[1].strip()
-    session = async_session_maker()
-    async with session:
+    maker = get_session_maker()
+    async with maker() as session:
         success, msg = await activate_code(
             session,
             message.from_user.id,
