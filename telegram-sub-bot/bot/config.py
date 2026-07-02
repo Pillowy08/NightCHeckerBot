@@ -10,6 +10,7 @@ class Config:
     ADMIN_IDS: list[int] = [
         int(x.strip()) for x in os.getenv("ADMIN_IDS", "").split(",") if x.strip()
     ]
+    ADMIN_CONTACT: str = os.getenv("ADMIN_CONTACT", "@admin")
 
     @property
     def async_database_url(self) -> str:

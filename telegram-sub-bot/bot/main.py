@@ -3,6 +3,7 @@ import logging
 
 from aiogram import Bot, Dispatcher
 from aiogram.fsm.storage.memory import MemoryStorage
+from aiogram.types import ErrorEvent
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from apscheduler.triggers.interval import IntervalTrigger
 
@@ -39,6 +40,14 @@ async def main():
     await bot.delete_webhook(drop_pending_updates=True)
     dp = Dispatcher(storage=MemoryStorage())
 
+    @dp.errors()
+    async def global_error_handler(event: ErrorEvent):
+        logger.error("Handler error", exc_info=event.exception)
+        if event.update and event.update.message:
+            await event.update.message.answer(
+                "❌ Произошла внутренняя ошибка. Попробуйте позже."
+            )
+
     dp.include_router(user_router)
 
     if config.ADMIN_IDS:
@@ -59,6 +68,8 @@ async def main():
 
     try:
         await dp.start_polling(bot)
+    except Exception as e:
+        logger.critical(f"Fatal error: {e}", exc_info=True)
     finally:
         scheduler.shutdown(wait=False)
         await close_db()

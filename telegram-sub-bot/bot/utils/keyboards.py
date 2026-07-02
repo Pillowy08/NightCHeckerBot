@@ -8,10 +8,13 @@ def main_menu_keyboard(is_admin: bool = False) -> ReplyKeyboardMarkup:
     kb.button(text="✅ Статус")
     kb.button(text="🔑 Ввести код")
     kb.button(text="❓ Помощь")
+    kb.button(text="📞 Администрация")
     kb.adjust(2)
     if is_admin:
         kb.button(text="⚙️ Админ панель")
-        kb.adjust(2, 1)
+        kb.adjust(2, 2)
+    else:
+        kb.adjust(2, 2, 1)
     return kb.as_markup(resize_keyboard=True)
 
 
